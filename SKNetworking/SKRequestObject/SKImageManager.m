@@ -73,11 +73,13 @@
 - (void)requestImageWithURL:(NSURL *)imageURL callback:(void(^)(UIImage *image))callback
 {
 	NSURLSessionTask *task = [mainSession dataTaskWithRequest:[NSURLRequest requestWithURL:imageURL] completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-		if (error) {
-			callback(nil);
-			return ;
-		}
-		callback([UIImage imageWithData:data]);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                callback(nil);
+                return ;
+            }
+            callback([UIImage imageWithData:data]);
+        });
 	}];
 	[task resume];
 }
@@ -90,14 +92,16 @@
 		return;
 	}
 	NSURLSessionTask *task = [mainSession dataTaskWithRequest:[NSURLRequest requestWithURL:imageURL] completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-		if (error) {
-			callback(nil);
-			return ;
-		}
-		if (!inKey || ![inKey length]) {
-			callback([UIImage imageWithData:data]);
-			return;
-		}
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                callback(nil);
+                return ;
+            }
+            if (!inKey || ![inKey length]) {
+                callback([UIImage imageWithData:data]);
+                return;
+            }
+        });
 		
 		NSMutableData *decodedData = [[NSMutableData alloc] initWithLength:[data length]];
 		CCCryptorRef encryptor = NULL;
@@ -108,7 +112,11 @@
 		
 		NSString *filePath = [fileDirectoryPath stringByAppendingPathComponent:inKey];
 		[decodedData writeToFile:filePath atomically:YES];
-		callback([UIImage imageWithData:data]);
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            callback([UIImage imageWithData:data]);    
+        });
+        
 	}];
 	[task resume];
 }

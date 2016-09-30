@@ -8,6 +8,7 @@
 
 #import "SKImageManager.h"
 #import <CommonCrypto/CommonCryptor.h>
+#import <CommonCrypto/CommonDigest.h>
 
 @interface SKImageManager() <NSURLSessionDelegate>
 {
@@ -70,6 +71,25 @@
 	return [UIImage imageWithData:decodedData];
 }
 
+- (NSString *)md5:(NSString *)str
+{
+	const char *cStr = [str UTF8String];
+	unsigned char result[CC_MD5_DIGEST_LENGTH];
+	CC_MD5( cStr, (int)str.length, result);
+	return [NSString
+			stringWithFormat: @"%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+			result[0], result[1],
+			result[2], result[3],
+			result[4], result[5],
+			result[6], result[7],
+			result[8], result[9],
+			result[10], result[11],
+			result[12], result[13],
+			result[14], result[15]
+			];
+	
+}
+
 - (void)requestImageWithURL:(NSURL *)imageURL callback:(void(^)(UIImage *image))callback
 {
 	NSURLSessionTask *task = [mainSession dataTaskWithRequest:[NSURLRequest requestWithURL:imageURL] completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
@@ -86,7 +106,8 @@
 
 - (void)requestImageWithURL:(NSURL *)imageURL encryptKey:(NSString *)inKey callback:(void(^)(UIImage *image))callback
 {
-	UIImage *cacheImage = [self imageWithFileKey:inKey];
+	NSString *md5Key = [self md5:inKey];
+	UIImage *cacheImage = [self imageWithFileKey:md5Key];
 	if (cacheImage) {
 		callback(cacheImage);
 		return;
@@ -97,7 +118,7 @@
                 callback(nil);
                 return ;
             }
-            if (!inKey || ![inKey length]) {
+            if (!md5Key || ![md5Key length]) {
                 callback([UIImage imageWithData:data]);
                 return;
             }
@@ -105,12 +126,12 @@
 		
 		NSMutableData *decodedData = [[NSMutableData alloc] initWithLength:[data length]];
 		CCCryptorRef encryptor = NULL;
-		const char *key = [inKey UTF8String];
+		const char *key = [md5Key UTF8String];
 		__unused CCCryptorStatus result = CCCryptorCreate(kCCEncrypt, kCCAlgorithmRC4, 0, key, strlen(key), NULL, &encryptor);
 		size_t outSize = 0;
 		CCCryptorUpdate(encryptor, [data bytes], (size_t)[data length], [decodedData mutableBytes], (size_t)[data length], &outSize);
 		
-		NSString *filePath = [fileDirectoryPath stringByAppendingPathComponent:inKey];
+		NSString *filePath = [fileDirectoryPath stringByAppendingPathComponent:md5Key];
 		[decodedData writeToFile:filePath atomically:YES];
         
         dispatch_async(dispatch_get_main_queue(), ^{
